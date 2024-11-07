@@ -167,27 +167,21 @@ def check_BSC_balance(address, bscscan_api_key, retries=3, delay=5):
                 return 0
 
 
-def check_SOL_balance(address, solscan_api_key, retries=3, delay=5):
-    # Solscan v2 API endpoint to check the Solana balance of an address
-    api_url = f"https://api.solscan.io/v2/account/tokens?address={address}"
-
-    headers = {
-        'Authorization': f'Bearer {solscan_api_key}'  # JWT Token im Authorization Header
-    }
+def check_SOL_balance(address, alchemy_api_key, retries=3, delay=5):
+    # Alchemy API endpoint to check the Solana balance of an address
+    api_url = f"https://solana.alchemyapi.io/v2/{alchemy_api_key}/getBalance/{address}"
 
     for attempt in range(retries):
         try:
-            # Make a request to the Solscan API with JWT token
-            response = requests.get(api_url, headers=headers)
+            # Make a request to the Alchemy Solana API with API key in header
+            response = requests.get(api_url)
             data = response.json()
 
-            # Check if the request was successful and 'data' is in the response
-            if "data" in data:
-                # Find the SOL balance from the response data
-                for token in data["data"]:
-                    if token["tokenSymbol"] == "SOL":
-                        balance = float(token["amount"]) / 10**9  # Convert lamports to SOL
-                        return balance
+            # Check if the request was successful and contains 'result'
+            if "result" in data:
+                # The balance is returned in lamports, convert it to SOL (1 SOL = 1e9 lamports)
+                balance = int(data["result"]) / 10**9  # Convert lamports to SOL
+                return balance
             logging.error("Solana balance not found in response: %s", data)
             return 0
         except Exception as e:
