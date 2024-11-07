@@ -39,7 +39,7 @@ logging.basicConfig(
 load_dotenv(env_file_path)
 
 # Environment variable validation
-required_env_vars = ["ETHERSCAN_API_KEY", "BSCSCAN_API_KEY", "ALCHEMY_API_KEY"]
+required_env_vars = ["ETHERSCAN_API_KEY", "BSCSCAN_API_KEY", "SOLSCAN_API_KEY"]
 missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 if missing_vars:
     raise EnvironmentError(f"Missing environment variables: {', '.join(missing_vars)}")
@@ -167,24 +167,25 @@ def check_BSC_balance(address, bscscan_api_key, retries=3, delay=5):
                 return 0
 
 
-def check_SOL_balance(address, alchemy_api_key, retries=3, delay=5):
-    # Alchemy API endpoint to check the Solana balance of an address
-    api_url = f"https://solana-mainnet.g.alchemy.com/v2/{alchemy_api_key}/getBalance/{address}"
+def check_SOL_balance(address, solscan_api_key, retries=3, delay=5):
+    # Solscan v2 API endpoint to check the Solana balance of an address
+    api_url = f"https://api.solscan.io/v2/account/tokens?address={address}"
 
     for attempt in range(retries):
         try:
-            # Make a request to the Alchemy Solana API
+            # Make a request to the Solscan API
             response = requests.get(api_url)
             data = response.json()
 
-            # Check if the request was successful
-            if response.status_code == 200 and "result" in data:
-                # Convert lamports to SOL (1 SOL = 1e9 lamports)
-                balance = int(data["result"]) / 1e9
-                return balance
-            else:
-                logging.error("Error getting Solana balance: %s", data.get("error", "Unknown"))
-                return 0
+            # Check if the request was successful and 'data' is in the response
+            if "data" in data:
+                # Find the SOL balance from the response data
+                for token in data["data"]:
+                    if token["tokenSymbol"] == "SOL":
+                        balance = float(token["amount"]) / 10**9  # Convert lamports to SOL
+                        return balance
+            logging.error("Solana balance not found in response: %s", data)
+            return 0
         except Exception as e:
             if attempt < retries - 1:
                 logging.error(
@@ -199,19 +200,12 @@ def check_SOL_balance(address, alchemy_api_key, retries=3, delay=5):
 def write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, BSC_address, BSC_balance, SOL_address, SOL_balance):
     # Write the seed, address, and balance to a file in the script's directory
     with open(wallets_file_path, "a") as f:
-        log_message = (
-            f"Seed: {seed}\n\n"  # Seed in a new line
-            f"BTC Address: {BTC_address}\nBalance: {BTC_balance} BTC\n\n"  # BTC address and balance
-            f"ETH Address: {ETH_address}\nBalance: {ETH_balance} ETH\n\n"  # ETH address and balance
-            f"BSC Address: {BSC_address}\nBalance: {BSC_balance} BNB\n\n"  # BSC address and balance
-            f"SOL Address: {SOL_address}\nBalance: {SOL_balance} SOL\n\n"  # Solana address and balance
-        )
+        log_message = f"Seed: {seed}\nBTC Address: {BTC_address}\nBalance: {BTC_balance} BTC\nETH Address: {ETH_address}\nBalance: {ETH_balance} ETH\nBSC Address: {BSC_address}\nBalance: {BSC_balance} BNB\nSOL Address: {SOL_address}\nBalance: {SOL_balance} SOL\n\n"
         f.write(log_message)
         logging.info(f"Written to file: {log_message}")
 
 
 def main():
-    global wallets_scanned
     try:
         while True:
             seed = bip()
@@ -227,37 +221,32 @@ def main():
             # ETH
             ETH_address = bip44_ETH_wallet_from_seed(seed)
             etherscan_api_key = os.getenv("ETHERSCAN_API_KEY")
-            if not etherscan_api_key:
-                raise ValueError("The Etherscan API key must be set in the environment variables.")
             ETH_balance = check_ETH_balance(ETH_address, etherscan_api_key)
             logging.info(f"ETH address: {ETH_address}")
             logging.info(f"ETH balance: {ETH_balance} ETH")
 
             # BSC
-            BSC_address = bip44_ETH_wallet_from_seed(seed)  # Same as ETH for simplicity, modify as needed
+            BSC_address = bip44_ETH_wallet_from_seed(seed)  # Same as ETH for simplicity
             bscscan_api_key = os.getenv("BSCSCAN_API_KEY")
-            if not bscscan_api_key:
-                raise ValueError("The BSCScan API key must be set in the environment variables.")
             BSC_balance = check_BSC_balance(BSC_address, bscscan_api_key)
             logging.info(f"BSC address: {BSC_address}")
             logging.info(f"BSC balance: {BSC_balance} BNB")
 
             # Solana
-            SOL_address = bip44_ETH_wallet_from_seed(seed)  # Same as ETH for simplicity, modify as needed
-            alchemy_api_key = os.getenv("ALCHEMY_API_KEY")
-            if not alchemy_api_key:
-                raise ValueError("The Alchemy API key must be set in the environment variables.")
-            SOL_balance = check_SOL_balance(SOL_address, alchemy_api_key)
+            SOL_address = bip44_ETH_wallet_from_seed(seed)  # Same as ETH for simplicity
+            solscan_api_key = os.getenv("SOLSCAN_API_KEY")
+            SOL_balance = check_SOL_balance(SOL_address, solscan_api_key)
             logging.info(f"SOL address: {SOL_address}")
             logging.info(f"SOL balance: {SOL_balance} SOL")
 
-            # Check if the address has a balance for any currency
+            # Check if the address has a balance
             if BTC_balance > 0 or ETH_balance > 0 or BSC_balance > 0 or SOL_balance > 0:
                 logging.info("(!) Wallet with balance found!")
                 write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, BSC_address, BSC_balance, SOL_address, SOL_balance)
 
     except KeyboardInterrupt:
         logging.info("Program interrupted by user. Exiting...")
+
 
 if __name__ == "__main__":
     main()
