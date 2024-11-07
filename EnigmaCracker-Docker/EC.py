@@ -170,7 +170,12 @@ def check_BSC_balance(address, bscscan_api_key, retries=3, delay=5):
 def write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, BSC_address, BSC_balance):
     # Write the seed, address, and balance to a file in the script's directory
     with open(wallets_file_path, "a") as f:
-        log_message = f"Seed: {seed}\nAddress: {BTC_address}\nBalance: {BTC_balance} BTC\n\nEthereum Address: {ETH_address}\nBalance: {ETH_balance} ETH\n\nBSC Address: {BSC_address}\nBalance: {BSC_balance} BNB\n\n"
+        log_message = (
+            f"Seed: {seed}\n\n"  # Seed in a new line
+            f"BTC Address: {BTC_address}\nBalance: {BTC_balance} BTC\n\n"  # BTC address and balance
+            f"ETH Address: {ETH_address}\nBalance: {ETH_balance} ETH\n\n"  # ETH address and balance
+            f"BSC Address: {BSC_address}\nBalance: {BSC_balance} BNB\n\n"  # BSC address and balance
+        )
         f.write(log_message)
         logging.info(f"Written to file: {log_message}")
 
