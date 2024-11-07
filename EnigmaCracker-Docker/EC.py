@@ -39,7 +39,7 @@ logging.basicConfig(
 load_dotenv(env_file_path)
 
 # Environment variable validation
-required_env_vars = ["ETHERSCAN_API_KEY", "BSCSCAN_API_KEY", "ALCHEMY_API_KEY"]
+required_env_vars = ["ETHERSCAN_API_KEY", "ALCHEMY_API_KEY", "FTMSCAN_API_KEY", "POLYGONSCAN_API_KEY", "WORLDSCAN_API_KEY"]
 missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 if missing_vars:
     raise EnvironmentError(f"Missing environment variables: {', '.join(missing_vars)}")
@@ -138,73 +138,94 @@ def check_BTC_balance(address, retries=3, delay=5):
                 return 0
 
 
-def check_BSC_balance(address, bscscan_api_key, retries=3, delay=5):
-    # BSCScan API endpoint to check the balance of an address
-    api_url = f"https://api.bscscan.com/api?module=account&action=balance&address={address}&tag=latest&apikey={bscscan_api_key}"
+def check_FTM_balance(address, ftmscan_api_key, retries=3, delay=5):
+    # FTMScan API endpoint to check the Fantom balance of an address
+    api_url = f"https://api.ftmscan.com/api?module=account&action=balance&address={address}&tag=latest&apikey={ftmscan_api_key}"
 
     for attempt in range(retries):
         try:
-            # Make a request to the BSCScan API
             response = requests.get(api_url)
             data = response.json()
 
             # Check if the request was successful
             if data["status"] == "1":
-                # Convert Wei to BNB (1 BNB = 10^18 Wei)
+                # Convert the balance from Wei to FTM (1 FTM = 1e18 Wei)
                 balance = int(data["result"]) / 1e18
                 return balance
             else:
-                logging.error("Error getting balance: %s", data["message"])
+                logging.error("Error getting Fantom balance: %s", data["message"])
                 return 0
         except Exception as e:
             if attempt < retries - 1:
-                logging.error(
-                    f"Error checking balance, retrying in {delay} seconds: {str(e)}"
-                )
+                logging.error(f"Error checking Fantom balance, retrying in {delay} seconds: {str(e)}")
                 time.sleep(delay)
             else:
-                logging.error("Error checking balance: %s", str(e))
+                logging.error(f"Error checking Fantom balance: {str(e)}")
                 return 0
 
 
-def check_SOL_balance(address, alchemy_api_key, retries=3, delay=5):
-    # Alchemy API endpoint to check the Solana balance of an address
-    api_url = f"https://solana-mainnet.g.alchemy.com/v2/{alchemy_api_key}/getBalance/{address}"
+def check_MATIC_balance(address, polygonscan_api_key, retries=3, delay=5):
+    # Polygonscan API endpoint to check the MATIC balance of an address
+    api_url = f"https://api.polygonscan.com/api?module=account&action=balance&address={address}&tag=latest&apikey={polygonscan_api_key}"
 
     for attempt in range(retries):
         try:
-            # Make a request to the Alchemy Solana API
             response = requests.get(api_url)
             data = response.json()
 
             # Check if the request was successful
-            if response.status_code == 200 and "result" in data:
-                # Convert lamports to SOL (1 SOL = 1e9 lamports)
-                balance = int(data["result"]) / 1e9
+            if data["status"] == "1":
+                # Convert Wei to MATIC (1 MATIC = 1e18 Wei)
+                balance = int(data["result"]) / 1e18
                 return balance
             else:
-                logging.error("Error getting Solana balance: %s", data.get("error", "Unknown"))
+                logging.error("Error getting MATIC balance: %s", data["message"])
                 return 0
         except Exception as e:
             if attempt < retries - 1:
-                logging.error(
-                    f"Error checking Solana balance, retrying in {delay} seconds: {str(e)}"
-                )
+                logging.error(f"Error checking MATIC balance, retrying in {delay} seconds: {str(e)}")
                 time.sleep(delay)
             else:
-                logging.error("Error checking Solana balance: %s", str(e))
+                logging.error(f"Error checking MATIC balance: {str(e)}")
                 return 0
 
 
-def write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, BSC_address, BSC_balance, SOL_address, SOL_balance):
+def check_WLD_balance(address, worldscan_api_key, retries=3, delay=5):
+    # Worldscan API endpoint to check the Worldcoin balance of an address
+    api_url = f"https://api.worldscan.org/api?module=account&action=balance&address={address}&tag=latest&apikey={worldscan_api_key}"
+
+    for attempt in range(retries):
+        try:
+            response = requests.get(api_url)
+            data = response.json()
+
+            # Check if the request was successful
+            if data["status"] == "1":
+                # Convert Wei to WLD (1 WLD = 1e18 Wei)
+                balance = int(data["result"]) / 1e18
+                return balance
+            else:
+                logging.error("Error getting WLD balance: %s", data["message"])
+                return 0
+        except Exception as e:
+            if attempt < retries - 1:
+                logging.error(f"Error checking WLD balance, retrying in {delay} seconds: {str(e)}")
+                time.sleep(delay)
+            else:
+                logging.error(f"Error checking WLD balance: {str(e)}")
+                return 0
+
+
+def write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, FTM_address, FTM_balance, MATIC_address, MATIC_balance, WLD_address, WLD_balance):
     # Write the seed, address, and balance to a file in the script's directory
     with open(wallets_file_path, "a") as f:
         log_message = (
-            f"Seed: {seed}\n\n"  # Seed in a new line
-            f"BTC Address: {BTC_address}\nBalance: {BTC_balance} BTC\n\n"  # BTC address and balance
-            f"ETH Address: {ETH_address}\nBalance: {ETH_balance} ETH\n\n"  # ETH address and balance
-            f"BSC Address: {BSC_address}\nBalance: {BSC_balance} BNB\n\n"  # BSC address and balance
-            f"SOL Address: {SOL_address}\nBalance: {SOL_balance} SOL\n\n"  # Solana address and balance
+            f"Seed: {seed}\n"
+            f"BTC Address: {BTC_address}\nBalance: {BTC_balance} BTC\n\n"
+            f"ETH Address: {ETH_address}\nBalance: {ETH_balance} ETH\n\n"
+            f"FTM Address: {FTM_address}\nBalance: {FTM_balance} FTM\n\n"
+            f"MATIC Address: {MATIC_address}\nBalance: {MATIC_balance} MATIC\n\n"
+            f"WLD Address: {WLD_address}\nBalance: {WLD_balance} WLD\n\n"
         )
         f.write(log_message)
         logging.info(f"Written to file: {log_message}")
@@ -219,45 +240,34 @@ def main():
             BTC_address = bip44_BTC_seed_to_address(seed)
             BTC_balance = check_BTC_balance(BTC_address)
 
-            logging.info(f"Seed: {seed}")
-            logging.info(f"BTC address: {BTC_address}")
-            logging.info(f"BTC balance: {BTC_balance} BTC")
-            logging.info("")
-
             # ETH
             ETH_address = bip44_ETH_wallet_from_seed(seed)
             etherscan_api_key = os.getenv("ETHERSCAN_API_KEY")
-            if not etherscan_api_key:
-                raise ValueError("The Etherscan API key must be set in the environment variables.")
             ETH_balance = check_ETH_balance(ETH_address, etherscan_api_key)
-            logging.info(f"ETH address: {ETH_address}")
-            logging.info(f"ETH balance: {ETH_balance} ETH")
 
-            # BSC
-            BSC_address = bip44_ETH_wallet_from_seed(seed)  # Same as ETH for simplicity, modify as needed
-            bscscan_api_key = os.getenv("BSCSCAN_API_KEY")
-            if not bscscan_api_key:
-                raise ValueError("The BSCScan API key must be set in the environment variables.")
-            BSC_balance = check_BSC_balance(BSC_address, bscscan_api_key)
-            logging.info(f"BSC address: {BSC_address}")
-            logging.info(f"BSC balance: {BSC_balance} BNB")
+            # FTM
+            FTM_address = bip44_ETH_wallet_from_seed(seed)  # Assuming FTM uses the same derivation path
+            ftmscan_api_key = os.getenv("FTMSCAN_API_KEY")
+            FTM_balance = check_FTM_balance(FTM_address, ftmscan_api_key)
 
-            # Solana
-            SOL_address = bip44_ETH_wallet_from_seed(seed)  # Same as ETH for simplicity, modify as needed
-            alchemy_api_key = os.getenv("ALCHEMY_API_KEY")
-            if not alchemy_api_key:
-                raise ValueError("The Alchemy API key must be set in the environment variables.")
-            SOL_balance = check_SOL_balance(SOL_address, alchemy_api_key)
-            logging.info(f"SOL address: {SOL_address}")
-            logging.info(f"SOL balance: {SOL_balance} SOL")
+            # MATIC
+            MATIC_address = bip44_ETH_wallet_from_seed(seed)  # Assuming MATIC uses the same derivation path
+            polygonscan_api_key = os.getenv("POLYGONSCAN_API_KEY")
+            MATIC_balance = check_MATIC_balance(MATIC_address, polygonscan_api_key)
 
-            # Check if the address has a balance for any currency
-            if BTC_balance > 0 or ETH_balance > 0 or BSC_balance > 0 or SOL_balance > 0:
+            # WLD
+            WLD_address = bip44_ETH_wallet_from_seed(seed)  # Assuming WLD uses the same derivation path
+            worldscan_api_key = os.getenv("WORLDSCAN_API_KEY")
+            WLD_balance = check_WLD_balance(WLD_address, worldscan_api_key)
+
+            # Check if any of the balances are greater than 0
+            if BTC_balance > 0 or ETH_balance > 0 or FTM_balance > 0 or MATIC_balance > 0 or WLD_balance > 0:
                 logging.info("(!) Wallet with balance found!")
-                write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, BSC_address, BSC_balance, SOL_address, SOL_balance)
+                write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, FTM_address, FTM_balance, MATIC_address, MATIC_balance, WLD_address, WLD_balance)
 
     except KeyboardInterrupt:
         logging.info("Program interrupted by user. Exiting...")
+
 
 if __name__ == "__main__":
     main()
