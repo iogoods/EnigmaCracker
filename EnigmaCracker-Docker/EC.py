@@ -171,10 +171,14 @@ def check_SOL_balance(address, solscan_api_key, retries=3, delay=5):
     # Solscan v2 API endpoint to check the Solana balance of an address
     api_url = f"https://api.solscan.io/v2/account/tokens?address={address}"
 
+    headers = {
+        'Authorization': f'Bearer {solscan_api_key}'  # JWT Token im Authorization Header
+    }
+
     for attempt in range(retries):
         try:
-            # Make a request to the Solscan API
-            response = requests.get(api_url)
+            # Make a request to the Solscan API with JWT token
+            response = requests.get(api_url, headers=headers)
             data = response.json()
 
             # Check if the request was successful and 'data' is in the response
@@ -195,6 +199,7 @@ def check_SOL_balance(address, solscan_api_key, retries=3, delay=5):
             else:
                 logging.error("Error checking Solana balance: %s", str(e))
                 return 0
+
 
 
 def write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, BSC_address, BSC_balance, SOL_address, SOL_balance):
