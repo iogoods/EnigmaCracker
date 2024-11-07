@@ -1,4 +1,3 @@
-# EnigmaCracker for Docker
 import sys
 import os
 import requests
@@ -40,7 +39,7 @@ logging.basicConfig(
 load_dotenv(env_file_path)
 
 # Environment variable validation
-required_env_vars = ["ETHERSCAN_API_KEY"]
+required_env_vars = ["ETHERSCAN_API_KEY", "BSCSCAN_API_KEY"]
 missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 if missing_vars:
     raise EnvironmentError(f"Missing environment variables: {', '.join(missing_vars)}")
@@ -139,10 +138,39 @@ def check_BTC_balance(address, retries=3, delay=5):
                 return 0
 
 
-def write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance):
+def check_BSC_balance(address, bscscan_api_key, retries=3, delay=5):
+    # BSCScan API endpoint to check the balance of an address
+    api_url = f"https://api.bscscan.com/api?module=account&action=balance&address={address}&tag=latest&apikey={bscscan_api_key}"
+
+    for attempt in range(retries):
+        try:
+            # Make a request to the BSCScan API
+            response = requests.get(api_url)
+            data = response.json()
+
+            # Check if the request was successful
+            if data["status"] == "1":
+                # Convert Wei to BNB (1 BNB = 10^18 Wei)
+                balance = int(data["result"]) / 1e18
+                return balance
+            else:
+                logging.error("Error getting balance: %s", data["message"])
+                return 0
+        except Exception as e:
+            if attempt < retries - 1:
+                logging.error(
+                    f"Error checking balance, retrying in {delay} seconds: {str(e)}"
+                )
+                time.sleep(delay)
+            else:
+                logging.error("Error checking balance: %s", str(e))
+                return 0
+
+
+def write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, BSC_address, BSC_balance):
     # Write the seed, address, and balance to a file in the script's directory
     with open(wallets_file_path, "a") as f:
-        log_message = f"Seed: {seed}\nAddress: {BTC_address}\nBalance: {BTC_balance} BTC\n\nEthereum Address: {ETH_address}\nBalance: {ETH_balance} ETH\n\n"
+        log_message = f"Seed: {seed}\nAddress: {BTC_address}\nBalance: {BTC_balance} BTC\n\nEthereum Address: {ETH_address}\nBalance: {ETH_balance} ETH\n\nBSC Address: {BSC_address}\nBalance: {BSC_balance} BNB\n\n"
         f.write(log_message)
         logging.info(f"Written to file: {log_message}")
 
@@ -163,21 +191,30 @@ def main():
 
             # ETH
             ETH_address = bip44_ETH_wallet_from_seed(seed)
-            ###!
             etherscan_api_key = os.getenv("ETHERSCAN_API_KEY")
             if not etherscan_api_key:
                 raise ValueError(
                     "The Etherscan API key must be set in the environment variables."
                 )
-            ###!
             ETH_balance = check_ETH_balance(ETH_address, etherscan_api_key)
             logging.info(f"ETH address: {ETH_address}")
             logging.info(f"ETH balance: {ETH_balance} ETH")
 
+            # BSC
+            BSC_address = bip44_ETH_wallet_from_seed(seed)  # Same derivation as ETH
+            bscscan_api_key = os.getenv("BSCSCAN_API_KEY")
+            if not bscscan_api_key:
+                raise ValueError(
+                    "The BSCScan API key must be set in the environment variables."
+                )
+            BSC_balance = check_BSC_balance(BSC_address, bscscan_api_key)
+            logging.info(f"BSC address: {BSC_address}")
+            logging.info(f"BSC balance: {BSC_balance} BNB")
+
             # Check if the address has a balance
-            if BTC_balance > 0 or ETH_balance > 0:
+            if BTC_balance > 0 or ETH_balance > 0 or BSC_balance > 0:
                 logging.info("(!) Wallet with balance found!")
-                write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance)
+                write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, BSC_address, BSC_balance)
 
     except KeyboardInterrupt:
         logging.info("Program interrupted by user. Exiting...")
