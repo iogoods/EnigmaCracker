@@ -39,7 +39,7 @@ logging.basicConfig(
 load_dotenv(env_file_path)
 
 # Environment variable validation
-required_env_vars = ["ETHERSCAN_API_KEY", "BSCSCAN_API_KEY", "SOLSCAN_API_KEY"]
+required_env_vars = ["ETHERSCAN_API_KEY", "ALCHEMY_API_KEY"]
 missing_vars = [var for var in required_env_vars if not os.getenv(var)]
 if missing_vars:
     raise EnvironmentError(f"Missing environment variables: {', '.join(missing_vars)}")
@@ -138,42 +138,13 @@ def check_BTC_balance(address, retries=3, delay=5):
                 return 0
 
 
-def check_BSC_balance(address, bscscan_api_key, retries=3, delay=5):
-    # BSCScan API endpoint to check the balance of an address
-    api_url = f"https://api.bscscan.com/api?module=account&action=balance&address={address}&tag=latest&apikey={bscscan_api_key}"
-
-    for attempt in range(retries):
-        try:
-            # Make a request to the BSCScan API
-            response = requests.get(api_url)
-            data = response.json()
-
-            # Check if the request was successful
-            if data["status"] == "1":
-                # Convert Wei to BNB (1 BNB = 10^18 Wei)
-                balance = int(data["result"]) / 1e18
-                return balance
-            else:
-                logging.error("Error getting balance: %s", data["message"])
-                return 0
-        except Exception as e:
-            if attempt < retries - 1:
-                logging.error(
-                    f"Error checking balance, retrying in {delay} seconds: {str(e)}"
-                )
-                time.sleep(delay)
-            else:
-                logging.error("Error checking balance: %s", str(e))
-                return 0
-
-
 def check_SOL_balance(address, alchemy_api_key, retries=3, delay=5):
     # Alchemy API endpoint to check the Solana balance of an address
     api_url = f"https://solana.alchemyapi.io/v2/{alchemy_api_key}/getBalance/{address}"
 
     for attempt in range(retries):
         try:
-            # Make a request to the Alchemy Solana API with API key in header
+            # Make a request to the Alchemy Solana API with API key in URL
             response = requests.get(api_url)
             data = response.json()
 
@@ -193,7 +164,6 @@ def check_SOL_balance(address, alchemy_api_key, retries=3, delay=5):
             else:
                 logging.error("Error checking Solana balance: %s", str(e))
                 return 0
-
 
 
 def write_to_file(seed, BTC_address, BTC_balance, ETH_address, ETH_balance, BSC_address, BSC_balance, SOL_address, SOL_balance):
@@ -231,10 +201,10 @@ def main():
             logging.info(f"BSC address: {BSC_address}")
             logging.info(f"BSC balance: {BSC_balance} BNB")
 
-            # Solana
+            # Solana (Alchemy)
             SOL_address = bip44_ETH_wallet_from_seed(seed)  # Same as ETH for simplicity
-            solscan_api_key = os.getenv("SOLSCAN_API_KEY")
-            SOL_balance = check_SOL_balance(SOL_address, solscan_api_key)
+            alchemy_api_key = os.getenv("ALCHEMY_API_KEY")
+            SOL_balance = check_SOL_balance(SOL_address, alchemy_api_key)
             logging.info(f"SOL address: {SOL_address}")
             logging.info(f"SOL balance: {SOL_balance} SOL")
 
